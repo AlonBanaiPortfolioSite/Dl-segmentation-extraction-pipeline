@@ -83,7 +83,7 @@ Manually segment reference brains; propagate masks to new samples via registrati
 
 ---
 
-## Approach 4: GMM + Active Contour (Current Solution)
+## Approach 4: GMM + Active Contour (Failed)
 
 ### Strategy
 
@@ -105,17 +105,21 @@ Re-examine Approach 1 with a two-stage pipeline that accepts intermediate over-s
 - **Stage 2 solves over-segmentation:** Active contours use local edge information to find correct boundaries
 - **Key insight:** Over-segmentation is acceptable if it's correctable
 
-### Current Status
-
-work in progress
 
 **Challenge:** Active contours may fail when boundaries are weak (low contrast between brain and adjacent structures). Visual inspection and quality control needed.
 
 <!-- TODO: Add before/after images showing GMM over-segmentation → active contour correction -->
 
 ---
-
-## Approach 5: Deep Learning with Transformers (Planned)
+## Approach 5 - gmm with spatial prior
+Rational: the large voids are in similar location and brain strcture is preserved so we should add spatial prior to the system.
+###stages:
+1)Use stage 4 as an approximated mask and calculate the center
+2)For each pixel calculate radius from the centere
+3)Preform GMM with intensity and radious. Use 3 clusters (remote areas with low signal= background, close areas with low signal = voids (forground), high intensity areas= forground).
+**Challenge:** in some cases the fish eyes emmit strong signal (depite they are not part of the brain)
+**Solution:** correct this manualy and use DL (stage 6)
+## Approach 6: Deep Learning with positional encoding (sucsess)
 
 ### Challenge
 
@@ -123,15 +127,12 @@ Standard CNNs rely on local features. Large voids (hundreds of pixels) exceed ty
 
 ### Solution
 
-**Architecture:** Transformer or CNN-Transformer hybrid
-- Self-attention mechanism captures long-range dependencies
-- Can infer that large voids surrounded by brain tissue are foreground, not background
+**Architecture:** Add positional encoding to nnUnet
 
-**Implementation:** Extend nnU-Net framework with Transformer blocks
+**Implementation:** Add to the input 3 channels (radius, cos(teta), sin(teta))
 
-**Training data:** Generated from Approach 4 (GMM + active contour)
-
-**Status:** Planned - pending sufficient training data from Approach 4
+**Training data:** Generated from Approach 5 
+**Result:** Dice score=0.92
 
 ---
 
@@ -143,22 +144,18 @@ Bilateral Filtering
     ↓
 GMM Segmentation
     ↓
-Aggressive Morphological Operations (accept over-segmentation)
-    ↓
-Active Contour Refinement (correct boundaries)
+Gmm with spatial prior
     ↓
 Segmentation Masks / Training Data
     ↓
-[Planned] Transformer-based nnU-Net → Robust Segmentation
+nnU-Net with positional encoding → Robust Segmentation
 ```
 
 ---
 
 ## Key Design Principles
 
-- **Accept intermediate failures if correctable:** Over-segmentation from morphology is acceptable if active contours can fix it
-- **Two-stage processing:** Separate void-filling from boundary refinement
-- **Long-range context for deep learning:** Voids require Transformers, not standard CNNs
+- **Long-range context for deep learning:** Voids require Transformers or cnn with positional encoding, not standard CNNs
 - **Iterative refinement:** Each failed approach informs the next design
 
 ---
@@ -167,5 +164,4 @@ Segmentation Masks / Training Data
 
 - **Morphological operations have limits alone:** But useful as first stage in multi-stage pipeline
 - **Registration requires anatomical consistency:** Atlas-based methods fail with field-of-view variations - not solvable with better atlases
-- **Stage failures can be acceptable:** Over-segmentation from stage 1 can be fixed in stage 2
 - **Problem structure dictates architecture:** Void size (hundreds of pixels) requires long-range methods (Transformers), not local methods (CNNs)
